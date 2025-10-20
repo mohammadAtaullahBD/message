@@ -1,24 +1,23 @@
 package dev.ataullah.message.ui.screens
 
 import android.provider.Telephony
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,11 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.ataullah.message.model.Conversation
 import dev.ataullah.message.model.Message
 import dev.ataullah.message.model.SimOption
-import dev.ataullah.message.ui.components.SimSelector
 import java.text.DateFormat
 import java.util.Date
 
@@ -41,7 +40,9 @@ fun ConversationDetailScreen(
     address: String,
     conversation: Conversation?,
     simOptions: List<SimOption>,
-    onSend: (String, Int?) -> Unit
+    onSend: (String, Int?) -> Unit,
+    selectedMessageIds: Set<Long>,
+    onToggleMessageSelection: (Long) -> Unit
 ) {
     val messages = remember(address, conversation?.messages) {
         conversation?.messages ?: emptyList()
@@ -51,6 +52,7 @@ fun ConversationDetailScreen(
         mutableStateOf(simOptions.firstOrNull()?.subscriptionId)
     }
     val listState = rememberLazyListState()
+    val context = LocalContext.current
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -58,7 +60,11 @@ fun ConversationDetailScreen(
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -67,58 +73,60 @@ fun ConversationDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(messages) { msg ->
-                MessageBubble(message = msg)
-            }
-        }
-
-        if (simOptions.isNotEmpty()) {
-            SimSelector(
-                simOptions = simOptions,
-                selectedSimId = selectedSimId,
-                onSimSelected = { selectedSimId = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            )
-        }
-
-        Box(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 72.dp),
-                placeholder = { Text("Type a message") }
-            )
-            SmallFloatingActionButton(
-                onClick = {
-                    val text = input.trim()
-                    if (text.isNotEmpty()) {
-                        onSend(text, selectedSimId)
-                        input = ""
+                val isSelected = selectedMessageIds.contains(msg.id)
+                MessageBubble(
+                    message = msg,
+                    isSelected = isSelected,
+                    onLongPress = { onToggleMessageSelection(msg.id) },
+                    onClick = {
+                        if (selectedMessageIds.isNotEmpty()) {
+                            onToggleMessageSelection(msg.id)
+                        }
                     }
-                },
-                modifier = Modifier.align(Alignment.BottomEnd)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send message"
                 )
             }
         }
+
+        BottomMessageBar(
+            body = input,
+            onBodyChange = { input = it },
+            selectedSimId = selectedSimId,
+            simOptions = simOptions,
+            onSimChange = { newSimId ->
+                selectedSimId = newSimId
+                val info = simOptions.firstOrNull { it.subscriptionId == newSimId }
+                Toast.makeText(
+                    context,
+                    info?.let { option -> "Selected ${option.label}" } ?: "SIM selected",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onSend = {
+                val text = input.trim()
+                if (text.isNotEmpty()) {
+                    onSend(text, selectedSimId)
+                    input = ""
+                }
+            }
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(
+    message: Message,
+    isSelected: Boolean,
+    onLongPress: () -> Unit,
+    onClick: () -> Unit
+) {
     val isOutgoing = message.type == Telephony.Sms.MESSAGE_TYPE_SENT ||
         message.type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
     val arrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
-    val bubbleColor = if (isOutgoing) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+    val bubbleColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        isOutgoing -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val contentColor = if (isOutgoing) {
         MaterialTheme.colorScheme.onPrimaryContainer
@@ -152,7 +160,14 @@ private fun MessageBubble(message: Message) {
                 contentColor = contentColor,
                 shape = shape,
                 tonalElevation = 1.dp,
-                modifier = Modifier.fillMaxWidth(0.85f)
+                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongPress,
+                        enabled = true
+                    )
             ) {
                 Text(
                     text = message.body,

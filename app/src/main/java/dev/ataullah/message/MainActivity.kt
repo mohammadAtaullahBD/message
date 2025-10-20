@@ -5,7 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,7 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +32,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -61,15 +70,27 @@ class MainActivity : ComponentActivity() {
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStackEntry?.destination?.route
                 val simOptions by viewModel.simOptions.collectAsStateWithLifecycle()
+                val conversations by viewModel.conversations.collectAsStateWithLifecycle()
                 val context = LocalContext.current
+                val clipboardManager = LocalClipboardManager.current
 
                 var showSearch by rememberSaveable { mutableStateOf(false) }
                 var searchQuery by rememberSaveable { mutableStateOf("") }
+                var selectedConversations by remember { mutableStateOf(setOf<String>()) }
+                var visibleConversationAddresses by remember { mutableStateOf(setOf<String>()) }
+                var selectedMessageIds by remember { mutableStateOf(setOf<Long>()) }
+
+                fun <T> Set<T>.toggle(item: T): Set<T> =
+                    if (contains(item)) this - item else this + item
 
                 LaunchedEffect(currentRoute) {
                     if (currentRoute != NavRoutes.Conversations.route) {
                         showSearch = false
                         searchQuery = ""
+                        selectedConversations = emptySet()
+                    }
+                    if (currentRoute != NavRoutes.ConversationDetail.route) {
+                        selectedMessageIds = emptySet()
                     }
                 }
 
@@ -94,32 +115,81 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         when (currentRoute) {
                             NavRoutes.Conversations.route -> {
-                                TopAppBar(
-                                    title = { Text("Messages") },
-                                    actions = {
-                                        IconButton(onClick = {
-                                            if (showSearch) {
-                                                showSearch = false
-                                                searchQuery = ""
-                                            } else {
-                                                showSearch = true
-                                            }
-                                        }) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Search,
-                                                contentDescription = if (showSearch) {
-                                                    "Hide search"
+                                val allVisibleSelected =
+                                    visibleConversationAddresses.isNotEmpty() &&
+                                        selectedConversations.containsAll(visibleConversationAddresses)
+                                if (selectedConversations.isEmpty()) {
+                                    TopAppBar(
+                                        title = { Text("Messages") },
+                                        actions = {
+                                            IconButton(onClick = {
+                                                if (showSearch) {
+                                                    showSearch = false
+                                                    searchQuery = ""
                                                 } else {
-                                                    "Show search"
+                                                    showSearch = true
                                                 }
-                                            )
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Search,
+                                                    contentDescription = if (showSearch) {
+                                                        "Hide search"
+                                                    } else {
+                                                        "Show search"
+                                                    }
+                                                )
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                } else {
+                                    TopAppBar(
+                                        title = { Text("${selectedConversations.size} selected") },
+                                        navigationIcon = {
+                                            IconButton(onClick = { selectedConversations = emptySet() }) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Close,
+                                                    contentDescription = "Cancel selection"
+                                                )
+                                            }
+                                        },
+                                        actions = {
+                                            IconButton(onClick = {
+                                                selectedConversations = if (allVisibleSelected) {
+                                                    selectedConversations - visibleConversationAddresses
+                                                } else {
+                                                    selectedConversations + visibleConversationAddresses
+                                                }
+                                            }) {
+                                                Icon(
+                                                    imageVector = if (allVisibleSelected) {
+                                                        Icons.Filled.CheckBox
+                                                    } else {
+                                                        Icons.Outlined.CheckBoxOutlineBlank
+                                                    },
+                                                    contentDescription = if (allVisibleSelected) {
+                                                        "Clear selection"
+                                                    } else {
+                                                        "Select all"
+                                                    }
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                viewModel.deleteConversations(selectedConversations)
+                                                selectedConversations = emptySet()
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Delete,
+                                                    contentDescription = "Delete conversations"
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
                             }
                             NavRoutes.ConversationDetail.route -> {
                                 val address =
                                     currentBackStackEntry?.arguments?.getString("address") ?: ""
+                                val conversation = conversations.find { it.address == address }
                                 var contactName by remember(address) { mutableStateOf<String?>(null) }
                                 LaunchedEffect(address) {
                                     contactName = withContext(Dispatchers.IO) {
@@ -127,22 +197,86 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 val displayName = contactName?.takeIf { it.isNotBlank() } ?: address
-                                TopAppBar(
-                                    title = {
-                                        Text(
-                                            text = displayName,
-                                            modifier = Modifier.clickable { launchContact(context, address, displayName) }
-                                        )
-                                    },
-                                    navigationIcon = {
-                                        IconButton(onClick = { navController.navigateUp() }) {
-                                            Icon(
-                                                Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Back"
+                                if (selectedMessageIds.isEmpty()) {
+                                    TopAppBar(
+                                        title = {
+                                            Text(
+                                                text = displayName,
+                                                modifier = Modifier.clickable { launchContact(context, address, displayName) }
                                             )
+                                        },
+                                        navigationIcon = {
+                                            IconButton(onClick = { navController.navigateUp() }) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                                    contentDescription = "Back"
+                                                )
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                } else {
+                                    val messageIds = conversation?.messages?.map { it.id }?.toSet().orEmpty()
+                                    val allSelected = messageIds.isNotEmpty() && selectedMessageIds.containsAll(messageIds)
+                                    TopAppBar(
+                                        title = { Text("${selectedMessageIds.size} selected") },
+                                        navigationIcon = {
+                                            IconButton(onClick = { selectedMessageIds = emptySet() }) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Close,
+                                                    contentDescription = "Cancel selection"
+                                                )
+                                            }
+                                        },
+                                        actions = {
+                                            IconButton(onClick = {
+                                                selectedMessageIds = if (allSelected) {
+                                                    emptySet()
+                                                } else {
+                                                    messageIds
+                                                }
+                                            }) {
+                                                Icon(
+                                                    imageVector = if (allSelected) {
+                                                        Icons.Filled.CheckBox
+                                                    } else {
+                                                        Icons.Outlined.CheckBoxOutlineBlank
+                                                    },
+                                                    contentDescription = if (allSelected) {
+                                                        "Clear selection"
+                                                    } else {
+                                                        "Select all"
+                                                    }
+                                                )
+                                            }
+                                            if (selectedMessageIds.size == 1) {
+                                                IconButton(onClick = {
+                                                    val messageId = selectedMessageIds.firstOrNull()
+                                                    val body = messageId?.let { id ->
+                                                        conversation?.messages?.firstOrNull { it.id == id }?.body
+                                                    }
+                                                    if (!body.isNullOrEmpty()) {
+                                                        clipboardManager.setText(AnnotatedString(body))
+                                                        Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.ContentCopy,
+                                                        contentDescription = "Copy message"
+                                                    )
+                                                }
+                                            }
+                                            IconButton(onClick = {
+                                                viewModel.deleteMessages(selectedMessageIds)
+                                                selectedMessageIds = emptySet()
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Delete,
+                                                    contentDescription = "Delete messages"
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     },
@@ -169,8 +303,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable(NavRoutes.Conversations.route) {
-                            val conversationsState = viewModel.conversations.collectAsStateWithLifecycle()
-                            val conversations = conversationsState.value
+                            BackHandler(enabled = selectedConversations.isNotEmpty()) {
+                                selectedConversations = emptySet()
+                            }
                             ConversationListScreen(
                                 conversations = conversations,
                                 onConversationClick = { address ->
@@ -180,7 +315,16 @@ class MainActivity : ComponentActivity() {
                                 },
                                 showSearch = showSearch,
                                 searchQuery = searchQuery,
-                                onSearchQueryChange = { searchQuery = it }
+                                onSearchQueryChange = { searchQuery = it },
+                                selectedAddresses = selectedConversations,
+                                onToggleSelection = { address ->
+                                    selectedConversations = selectedConversations.toggle(address)
+                                },
+                                onDeleteConversation = { address ->
+                                    viewModel.deleteConversations(setOf(address))
+                                    selectedConversations = selectedConversations - address
+                                },
+                                onVisibleAddressesChange = { visibleConversationAddresses = it }
                             )
                         }
                         composable(
@@ -188,16 +332,20 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("address") { type = NavType.StringType })
                         ) { entry ->
                             val address = entry.arguments?.getString("address") ?: ""
-                            val conversationsState =
-                                viewModel.conversations.collectAsStateWithLifecycle()
-                            val conversation =
-                                conversationsState.value.find { it.address == address }
+                            LaunchedEffect(address) {
+                                selectedMessageIds = emptySet()
+                            }
+                            val conversation = conversations.find { it.address == address }
                             ConversationDetailScreen(
                                 address = address,
                                 conversation = conversation,
                                 simOptions = simOptions,
                                 onSend = { text, subscriptionId ->
                                     viewModel.sendMessage(address, text, subscriptionId)
+                                },
+                                selectedMessageIds = selectedMessageIds,
+                                onToggleMessageSelection = { messageId ->
+                                    selectedMessageIds = selectedMessageIds.toggle(messageId)
                                 }
                             )
                         }

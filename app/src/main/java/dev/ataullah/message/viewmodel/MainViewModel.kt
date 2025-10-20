@@ -185,6 +185,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteMessages(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteMessages(ids)
+            _conversations.emit(repository.getConversations())
+        }
+    }
+
+    fun deleteConversations(addresses: Set<String>) {
+        if (addresses.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteConversations(addresses)
+            _conversations.emit(repository.getConversations())
+        }
+    }
+
     private fun registerSentReceiver() {
         if (sentReceiverRegistered) return
         ContextCompat.registerReceiver(
