@@ -54,4 +54,28 @@ class SmsRepository(private val context: Context) {
                 Conversation(addr, msgs.sortedBy { it.date })
             }
             .sortedByDescending { it.messages.lastOrNull()?.date }
+
+    fun deleteMessages(ids: Collection<Long>): Int {
+        if (ids.isEmpty()) return 0
+        val placeholders = ids.joinToString(separator = ",") { "?" }
+        val selection = "${Telephony.Sms._ID} IN ($placeholders)"
+        val selectionArgs = ids.map { it.toString() }.toTypedArray()
+        return context.contentResolver.delete(
+            Telephony.Sms.CONTENT_URI,
+            selection,
+            selectionArgs
+        )
+    }
+
+    fun deleteConversations(addresses: Collection<String>): Int {
+        if (addresses.isEmpty()) return 0
+        val placeholders = addresses.joinToString(separator = ",") { "?" }
+        val selection = "${Telephony.Sms.ADDRESS} IN ($placeholders)"
+        val selectionArgs = addresses.toTypedArray()
+        return context.contentResolver.delete(
+            Telephony.Sms.CONTENT_URI,
+            selection,
+            selectionArgs
+        )
+    }
 }
