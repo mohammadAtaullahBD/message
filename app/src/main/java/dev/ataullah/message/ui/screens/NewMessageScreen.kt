@@ -157,8 +157,7 @@ fun BottomMessageBar(
 ) {
     Surface(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+            .fillMaxWidth().padding(16.dp),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
     ) {
@@ -167,7 +166,6 @@ fun BottomMessageBar(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
             TextField(

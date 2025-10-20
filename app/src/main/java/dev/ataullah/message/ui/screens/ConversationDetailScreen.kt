@@ -162,7 +162,7 @@ private fun MessageBubble(
                 tonalElevation = 1.dp,
                 border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
+                    .fillMaxWidth(0.95f)
                     .combinedClickable(
                         onClick = onClick,
                         onLongClick = onLongPress,

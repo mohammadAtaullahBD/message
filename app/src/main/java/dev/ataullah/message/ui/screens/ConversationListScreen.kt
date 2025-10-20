@@ -139,42 +139,7 @@ fun ConversationListScreen(
                 SwipeToDismissBox(
                     state = dismissState,
                     enableDismissFromStartToEnd = false,
-                    backgroundContent = {
-                        val showDelete = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart ||
-                            dismissState.progress > 0f
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(MaterialTheme.shapes.small)
-                                    .padding(4.dp)
-                                    .background(
-                                        if (showDelete) {
-                                            MaterialTheme.colorScheme.errorContainer
-                                        } else {
-                                            Color.Transparent
-                                        }
-                                    )
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = null,
-                                    tint = if (showDelete) {
-                                        MaterialTheme.colorScheme.onErrorContainer
-                                    } else {
-                                        Color.Transparent
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    backgroundContent = {}
                 ) {
                     ListItem(
                         headlineContent = { Text(displayName) },
