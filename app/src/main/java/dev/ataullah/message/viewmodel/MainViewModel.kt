@@ -121,23 +121,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            val parts = smsManager.divideMessage(trimmedBody).takeIf { it.isNotEmpty() }
-                ?: listOf(trimmedBody)
+            val parts: ArrayList<String> = ArrayList(
+                smsManager.divideMessage(trimmedBody).takeIf { it.isNotEmpty() }
+                    ?: listOf(trimmedBody)
+            )
+
             val totalParts = parts.size
-            val sentIntents = parts.mapIndexed { index, _ ->
-                val intent = Intent(ACTION_SMS_SENT).apply {
-                    putExtra(EXTRA_TEMP_ID, tempId)
-                    putExtra(EXTRA_ADDRESS, trimmedAddress)
-                    putExtra(EXTRA_TOTAL_PARTS, totalParts)
-                    putExtra(EXTRA_PART_INDEX, index)
+
+            val sentIntents: ArrayList<PendingIntent> = ArrayList(
+                parts.mapIndexed { index, _ ->
+                    val intent = Intent(ACTION_SMS_SENT).apply {
+                        putExtra(EXTRA_TEMP_ID, tempId)
+                        putExtra(EXTRA_ADDRESS, trimmedAddress)
+                        putExtra(EXTRA_TOTAL_PARTS, totalParts)
+                        putExtra(EXTRA_PART_INDEX, index)
+                    }
+                    PendingIntent.getBroadcast(
+                        appContext,
+                        tempRequestCode(tempId, index),
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
                 }
-                PendingIntent.getBroadcast(
-                    appContext,
-                    tempRequestCode(tempId, index),
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            }
+            )
 
             try {
                 smsManager.sendMultipartTextMessage(
