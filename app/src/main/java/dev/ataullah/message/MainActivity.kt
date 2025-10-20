@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.provider.ContactsContract
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -76,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 var showSearch by rememberSaveable { mutableStateOf(false) }
                 var searchQuery by rememberSaveable { mutableStateOf("") }
                 var selectedConversations by remember { mutableStateOf(setOf<String>()) }
+                var visibleConversationAddresses by remember { mutableStateOf(setOf<String>()) }
                 var selectedMessageIds by remember { mutableStateOf(setOf<Long>()) }
 
                 fun <T> Set<T>.toggle(item: T): Set<T> =
@@ -113,6 +115,9 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         when (currentRoute) {
                             NavRoutes.Conversations.route -> {
+                                val allVisibleSelected =
+                                    visibleConversationAddresses.isNotEmpty() &&
+                                        selectedConversations.containsAll(visibleConversationAddresses)
                                 if (selectedConversations.isEmpty()) {
                                     TopAppBar(
                                         title = { Text("Messages") },
@@ -148,6 +153,26 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                         actions = {
+                                            IconButton(onClick = {
+                                                selectedConversations = if (allVisibleSelected) {
+                                                    selectedConversations - visibleConversationAddresses
+                                                } else {
+                                                    selectedConversations + visibleConversationAddresses
+                                                }
+                                            }) {
+                                                Icon(
+                                                    imageVector = if (allVisibleSelected) {
+                                                        Icons.Filled.CheckBox
+                                                    } else {
+                                                        Icons.Outlined.CheckBoxOutlineBlank
+                                                    },
+                                                    contentDescription = if (allVisibleSelected) {
+                                                        "Clear selection"
+                                                    } else {
+                                                        "Select all"
+                                                    }
+                                                )
+                                            }
                                             IconButton(onClick = {
                                                 viewModel.deleteConversations(selectedConversations)
                                                 selectedConversations = emptySet()
@@ -278,6 +303,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable(NavRoutes.Conversations.route) {
+                            BackHandler(enabled = selectedConversations.isNotEmpty()) {
+                                selectedConversations = emptySet()
+                            }
                             ConversationListScreen(
                                 conversations = conversations,
                                 onConversationClick = { address ->
@@ -295,7 +323,8 @@ class MainActivity : ComponentActivity() {
                                 onDeleteConversation = { address ->
                                     viewModel.deleteConversations(setOf(address))
                                     selectedConversations = selectedConversations - address
-                                }
+                                },
+                                onVisibleAddressesChange = { visibleConversationAddresses = it }
                             )
                         }
                         composable(

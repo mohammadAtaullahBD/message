@@ -51,7 +51,8 @@ fun ConversationListScreen(
     onSearchQueryChange: (String) -> Unit,
     selectedAddresses: Set<String>,
     onToggleSelection: (String) -> Unit,
-    onDeleteConversation: (String) -> Unit
+    onDeleteConversation: (String) -> Unit,
+    onVisibleAddressesChange: (Set<String>) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -110,6 +111,10 @@ fun ConversationListScreen(
             }
         }
 
+        LaunchedEffect(filtered) {
+            onVisibleAddressesChange(filtered.map { it.address }.toSet())
+        }
+
         LazyColumn {
             items(filtered, key = { it.address }) { convo ->
                 val contactInfo = contactCache[convo.address]
@@ -135,6 +140,8 @@ fun ConversationListScreen(
                     state = dismissState,
                     enableDismissFromStartToEnd = false,
                     backgroundContent = {
+                        val showDelete = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart ||
+                            dismissState.progress > 0f
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -146,14 +153,24 @@ fun ConversationListScreen(
                                 modifier = Modifier
                                     .clip(MaterialTheme.shapes.small)
                                     .padding(4.dp)
-                                    .background(MaterialTheme.colorScheme.errorContainer)
+                                    .background(
+                                        if (showDelete) {
+                                            MaterialTheme.colorScheme.errorContainer
+                                        } else {
+                                            Color.Transparent
+                                        }
+                                    )
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Delete,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                    tint = if (showDelete) {
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    } else {
+                                        Color.Transparent
+                                    }
                                 )
                             }
                         }

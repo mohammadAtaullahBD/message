@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.outlined.SimCard
 import androidx.compose.material3.Icon
@@ -224,7 +224,7 @@ fun BottomMessageBar(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    imageVector = Icons.Default.Send,
                     contentDescription = "Send",
                     tint = sendTint
                 )
@@ -289,7 +289,7 @@ private fun buildSuggestions(contacts: List<ContactInfo>, query: String): List<C
     return contacts.filter { contact ->
         val matchesName = contact.name?.contains(trimmed, ignoreCase = true) == true
         val matchesNumber = sanitizedQuery.isNotEmpty() &&
-                sanitizeNumber(contact.number).contains(sanitizedQuery)
+            sanitizeNumber(contact.number).contains(sanitizedQuery)
         matchesName || matchesNumber
     }
 }
