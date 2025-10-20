@@ -306,6 +306,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable(NavRoutes.Permission.route) {
                             PermissionScreen {
+                                viewModel.loadConversations()
+                                viewModel.refreshSimOptions()
                                 navController.navigate(NavRoutes.Conversations.route) {
                                     popUpTo(NavRoutes.Permission.route) { inclusive = true }
                                 }
