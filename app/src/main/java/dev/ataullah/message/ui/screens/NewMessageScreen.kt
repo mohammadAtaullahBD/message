@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.outlined.SimCard
 import androidx.compose.material3.Icon
@@ -72,7 +72,6 @@ fun NewMessageScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // 🧩 Main UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -113,7 +112,6 @@ fun NewMessageScreen(
             Spacer(modifier = Modifier.weight(1f))
         }
 
-        // ✉️ Bottom Message Bar
         BottomMessageBar(
             modifier = Modifier.align(Alignment.BottomCenter),
             body = body,
@@ -209,11 +207,6 @@ fun BottomMessageBar(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = "Switch SIM",
-                    tint = Color(0xFF2196F3)
-                )
             }
 
             val sendTint = if (body.isNotBlank()) {
@@ -231,7 +224,7 @@ fun BottomMessageBar(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
                     tint = sendTint
                 )
@@ -239,7 +232,6 @@ fun BottomMessageBar(
         }
     }
 }
-
 
 private data class ContactInfo(val name: String?, val number: String)
 
@@ -297,7 +289,7 @@ private fun buildSuggestions(contacts: List<ContactInfo>, query: String): List<C
     return contacts.filter { contact ->
         val matchesName = contact.name?.contains(trimmed, ignoreCase = true) == true
         val matchesNumber = sanitizedQuery.isNotEmpty() &&
-            sanitizeNumber(contact.number).contains(sanitizedQuery)
+                sanitizeNumber(contact.number).contains(sanitizedQuery)
         matchesName || matchesNumber
     }
 }
