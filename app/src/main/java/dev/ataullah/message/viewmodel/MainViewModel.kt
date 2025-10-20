@@ -8,10 +8,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.content.pm.PackageManager
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,6 +40,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val appContext: Context = application.applicationContext
     private val tempMessageId = AtomicLong(-1L)
+
+    private val smsContentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            super.onChange(selfChange)
+            if (hasConversationPermissions()) {
+                loadConversations()
+            }
+        }
+    }
 
     private val smsSentReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -65,6 +77,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var sentReceiverRegistered = false
+    private var smsObserverRegistered = false
 
     init {
         loadConversations()
@@ -77,6 +90,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _conversations.value = emptyList()
             return
         }
+
+        ensureSmsObserver()
 
         viewModelScope.launch(Dispatchers.IO) {
             _conversations.emit(repository.getConversations())
@@ -181,6 +196,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sentReceiverRegistered = true
     }
 
+    private fun ensureSmsObserver() {
+        if (smsObserverRegistered || !hasConversationPermissions()) return
+        runCatching {
+            appContext.contentResolver.registerContentObserver(
+                Telephony.Sms.CONTENT_URI,
+                true,
+                smsContentObserver
+            )
+            smsObserverRegistered = true
+        }
+    }
+
     private fun addTemporaryMessage(message: Message) {
         _conversations.update { current ->
             val updated = current.toMutableList()
@@ -222,6 +249,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             runCatching { appContext.unregisterReceiver(smsSentReceiver) }
         }
         sentReceiverRegistered = false
+        if (smsObserverRegistered) {
+            runCatching { appContext.contentResolver.unregisterContentObserver(smsContentObserver) }
+        }
+        smsObserverRegistered = false
         super.onCleared()
     }
 

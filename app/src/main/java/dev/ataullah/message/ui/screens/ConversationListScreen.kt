@@ -25,27 +25,45 @@ import dev.ataullah.message.util.ContactUtils
 @Composable
 fun ConversationListScreen(
     conversations: List<Conversation>,
-    onConversationClick: (String) -> Unit
+    onConversationClick: (String) -> Unit,
+    showSearch: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
 
+    val sortedConversations by remember(conversations) {
+        derivedStateOf {
+            conversations.sortedByDescending { convo ->
+                convo.messages.maxOfOrNull { it.date } ?: Long.MIN_VALUE
+            }
+        }
+    }
+
     Column {
-        TextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            placeholder = { Text("Search…") }
-        )
-        // Filter conversations by number/name or last message body
-        val filtered = conversations.filter { convo ->
+        if (showSearch) {
+            TextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                placeholder = { Text("Search…") }
+            )
+        }
+
+        val filtered = remember(sortedConversations, showSearch, searchQuery) {
             val query = searchQuery.trim().lowercase()
-            if (query.isBlank()) return@filter true
-            val number = convo.address
-            val lastBody = convo.messages.lastOrNull()?.body ?: ""
-            number.contains(query, ignoreCase = true) || lastBody.contains(query, ignoreCase = true)
+            if (!showSearch || query.isBlank()) {
+                sortedConversations
+            } else {
+                sortedConversations.filter { convo ->
+                    val number = convo.address
+                    val lastBody = convo.messages.lastOrNull()?.body ?: ""
+                    number.contains(query, ignoreCase = true) ||
+                        lastBody.contains(query, ignoreCase = true)
+                }
+            }
         }
         LazyColumn {
             items(filtered) { convo ->

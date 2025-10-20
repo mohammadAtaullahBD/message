@@ -1,19 +1,30 @@
 package dev.ataullah.message
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.ContactsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,6 +39,9 @@ import dev.ataullah.message.ui.screens.NewMessageScreen
 import dev.ataullah.message.ui.screens.PermissionScreen
 import dev.ataullah.message.ui.theme.MessageTheme
 import dev.ataullah.message.viewmodel.MainViewModel
+import dev.ataullah.message.util.ContactUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -47,6 +61,17 @@ class MainActivity : ComponentActivity() {
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStackEntry?.destination?.route
                 val simOptions by viewModel.simOptions.collectAsStateWithLifecycle()
+                val context = LocalContext.current
+
+                var showSearch by rememberSaveable { mutableStateOf(false) }
+                var searchQuery by rememberSaveable { mutableStateOf("") }
+
+                LaunchedEffect(currentRoute) {
+                    if (currentRoute != NavRoutes.Conversations.route) {
+                        showSearch = false
+                        searchQuery = ""
+                    }
+                }
 
                 // Automatically navigate if the app was launched with an SMS intent
                 LaunchedEffect(initialAddress) {
@@ -69,13 +94,46 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         when (currentRoute) {
                             NavRoutes.Conversations.route -> {
-                                TopAppBar(title = { Text("Messages") })
+                                TopAppBar(
+                                    title = { Text("Messages") },
+                                    actions = {
+                                        IconButton(onClick = {
+                                            if (showSearch) {
+                                                showSearch = false
+                                                searchQuery = ""
+                                            } else {
+                                                showSearch = true
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Search,
+                                                contentDescription = if (showSearch) {
+                                                    "Hide search"
+                                                } else {
+                                                    "Show search"
+                                                }
+                                            )
+                                        }
+                                    }
+                                )
                             }
                             NavRoutes.ConversationDetail.route -> {
                                 val address =
                                     currentBackStackEntry?.arguments?.getString("address") ?: ""
+                                var contactName by remember(address) { mutableStateOf<String?>(null) }
+                                LaunchedEffect(address) {
+                                    contactName = withContext(Dispatchers.IO) {
+                                        ContactUtils.getContactInfo(context, address)?.name
+                                    }
+                                }
+                                val displayName = contactName?.takeIf { it.isNotBlank() } ?: address
                                 TopAppBar(
-                                    title = { Text(address) },
+                                    title = {
+                                        Text(
+                                            text = displayName,
+                                            modifier = Modifier.clickable { launchContact(context, address, displayName) }
+                                        )
+                                    },
                                     navigationIcon = {
                                         IconButton(onClick = { navController.navigateUp() }) {
                                             Icon(
@@ -113,11 +171,17 @@ class MainActivity : ComponentActivity() {
                         composable(NavRoutes.Conversations.route) {
                             val conversationsState = viewModel.conversations.collectAsStateWithLifecycle()
                             val conversations = conversationsState.value
-                            ConversationListScreen(conversations) { address ->
-                                navController.navigate(
-                                    NavRoutes.ConversationDetail.createRoute(address)
-                                )
-                            }
+                            ConversationListScreen(
+                                conversations = conversations,
+                                onConversationClick = { address ->
+                                    navController.navigate(
+                                        NavRoutes.ConversationDetail.createRoute(address)
+                                    )
+                                },
+                                showSearch = showSearch,
+                                searchQuery = searchQuery,
+                                onSearchQueryChange = { searchQuery = it }
+                            )
                         }
                         composable(
                             NavRoutes.ConversationDetail.route,
@@ -154,4 +218,18 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+private fun launchContact(context: Context, phoneNumber: String, displayName: String) {
+    val intent = Intent(ContactsContract.Intents.SHOW_OR_CREATE_CONTACT).apply {
+        data = Uri.parse("tel:$phoneNumber")
+        putExtra(ContactsContract.Intents.EXTRA_FORCE_CREATE, true)
+        if (displayName.isNotBlank() && displayName != phoneNumber) {
+            putExtra(ContactsContract.Intents.Insert.NAME, displayName)
+        }
+        if (context !is ComponentActivity) {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+    runCatching { context.startActivity(intent) }
 }
