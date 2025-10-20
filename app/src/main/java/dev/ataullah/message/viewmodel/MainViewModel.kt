@@ -1,5 +1,6 @@
 package dev.ataullah.message.viewmodel
 
+import android.Manifest
 import android.app.Activity
 import android.app.Application
 import android.app.PendingIntent
@@ -7,9 +8,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ataullah.message.data.SmsRepository
@@ -23,7 +26,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
-import androidx.core.content.ContextCompat
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SmsRepository(application)
@@ -71,6 +73,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadConversations() {
+        if (!hasConversationPermissions()) {
+            _conversations.value = emptyList()
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             _conversations.emit(repository.getConversations())
         }
@@ -224,5 +231,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val EXTRA_ADDRESS = "extra_address"
         private const val EXTRA_TOTAL_PARTS = "extra_total_parts"
         private const val EXTRA_PART_INDEX = "extra_part_index"
+    }
+
+    private fun hasConversationPermissions(): Boolean {
+        val readSmsGranted = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val readContactsGranted = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.READ_CONTACTS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        return readSmsGranted && readContactsGranted
     }
 }
