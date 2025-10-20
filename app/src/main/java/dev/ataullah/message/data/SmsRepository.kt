@@ -15,7 +15,8 @@ class SmsRepository(private val context: Context) {
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.BODY,
                 Telephony.Sms.DATE,
-                Telephony.Sms.TYPE
+                Telephony.Sms.TYPE,
+                Telephony.Sms.STATUS
             ),
             null,
             null,
@@ -34,7 +35,11 @@ class SmsRepository(private val context: Context) {
                         address = c.getString(addressIndex) ?: "",
                         body = c.getString(bodyIndex) ?: "",
                         date = c.getLong(dateIndex),
-                        type = c.getInt(typeIndex)
+                        type = c.getInt(typeIndex),
+                        status = c.getColumnIndex(Telephony.Sms.STATUS).takeIf { it >= 0 }
+                            ?.let { idx ->
+                                if (!c.isNull(idx)) c.getInt(idx) else null
+                            }
                     )
                 )
             }
@@ -46,7 +51,7 @@ class SmsRepository(private val context: Context) {
         getAllMessages()
             .groupBy { it.address }
             .map { (addr, msgs) ->
-                Conversation(addr, msgs.sortedByDescending { it.date })
+                Conversation(addr, msgs.sortedBy { it.date })
             }
-            .sortedByDescending { it.messages.firstOrNull()?.date }
+            .sortedByDescending { it.messages.lastOrNull()?.date }
 }

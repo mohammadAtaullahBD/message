@@ -38,7 +38,8 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
             Manifest.permission.READ_SMS,
             Manifest.permission.RECEIVE_SMS,
             Manifest.permission.SEND_SMS,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_PHONE_STATE
         )
     )
 
@@ -46,7 +47,9 @@ fun PermissionScreen(onPermissionsGranted: () -> Unit) {
     val mandatoryPermissionsGranted by remember {
         derivedStateOf {
             permissionsState.permissions
-                .filter { it.permission != Manifest.permission.SEND_SMS }
+                .filter {
+                    it.permission != Manifest.permission.SEND_SMS
+                }
                 .all { it.status.isGranted }
         }
     }

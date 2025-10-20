@@ -46,11 +46,18 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStackEntry?.destination?.route
+                val simOptions by viewModel.simOptions.collectAsStateWithLifecycle()
 
                 // Automatically navigate if the app was launched with an SMS intent
                 LaunchedEffect(initialAddress) {
                     if (initialAddress != null) {
                         navController.navigate(NavRoutes.NewMessage.route)
+                    }
+                }
+
+                LaunchedEffect(currentRoute) {
+                    if (currentRoute != null && currentRoute != NavRoutes.Permission.route) {
+                        viewModel.refreshSimOptions()
                     }
                 }
 
@@ -121,15 +128,19 @@ class MainActivity : ComponentActivity() {
                             ConversationDetailScreen(
                                 address = address,
                                 conversation = conversation,
-                                onSend = { text -> viewModel.sendMessage(address, text) }
+                                simOptions = simOptions,
+                                onSend = { text, subscriptionId ->
+                                    viewModel.sendMessage(address, text, subscriptionId)
+                                }
                             )
                         }
                         composable(NavRoutes.NewMessage.route) {
                             NewMessageScreen(
                                 initialAddress = initialAddress ?: "",
                                 initialBody = initialBody ?: "",
-                                onSend = { number, body ->
-                                    viewModel.sendMessage(number, body)
+                                simOptions = simOptions,
+                                onSend = { number, body, subscriptionId ->
+                                    viewModel.sendMessage(number, body, subscriptionId)
                                     navController.popBackStack()
                                 },
                                 onCancel = { navController.popBackStack() }
