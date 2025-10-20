@@ -6,4 +6,6 @@ sealed class NavRoutes(val route: String) {
     object ConversationDetail : NavRoutes("conversationDetail/{address}") {
         fun createRoute(address: String): String = "conversationDetail/$address"
     }
+    // NavRoutes.kt
+    object NewMessage : NavRoutes("newMessage")
 }

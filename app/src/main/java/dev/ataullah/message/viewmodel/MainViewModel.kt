@@ -1,12 +1,7 @@
 package dev.ataullah.message.viewmodel
 
-import android.Manifest
 import android.app.Application
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.telephony.SmsManager
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ataullah.message.data.SmsRepository
@@ -32,24 +27,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sendMessage(address: String, body: String) {
-        val context = getApplication<Application>()
-        val canSend = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.SEND_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (canSend) {
-            try {
-                SmsManager.getDefault().sendTextMessage(address, null, body, null, null)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        } else {
-            // Fallback: open default SMS app with prefilled message
-            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$address")).apply {
-                putExtra("sms_body", body)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
+        val smsManager = SmsManager.getDefault()
+
+        // Divide long messages into multiple parts
+        val parts = smsManager.divideMessage(body)
+
+        try {
+            smsManager.sendMultipartTextMessage(address, null, parts, null, null)
+        } catch (_: SecurityException) {
+            // Handle the rare case where the OS denies sending; you could log or show a toast
         }
+
+        // Refresh conversations to show the sent message
         loadConversations()
     }
 }

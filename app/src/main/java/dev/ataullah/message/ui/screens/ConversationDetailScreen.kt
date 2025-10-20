@@ -1,14 +1,9 @@
 package dev.ataullah.message.ui.screens
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,19 +20,25 @@ fun ConversationDetailScreen(
 ) {
     val messages: List<Message> = conversation?.messages ?: emptyList()
     val input = remember { mutableStateOf("") }
+
     Column(modifier = Modifier.padding(16.dp)) {
-        Text(text = "Conversation with $address", modifier = Modifier.padding(bottom = 8.dp))
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .padding(bottom = 8.dp)
         ) {
             items(messages) { msg ->
-                val label = if (msg.type == 1) "From" else "To"
-                Text(
-                    text = "$label ${msg.address}: ${msg.body}",
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors()
+                ) {
+                    Text(
+                        text = msg.body,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
         }
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -45,7 +46,7 @@ fun ConversationDetailScreen(
                 value = input.value,
                 onValueChange = { input.value = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text(text = "Type a message") }
+                placeholder = { Text("Type a message") }
             )
             Button(
                 onClick = {
@@ -57,7 +58,7 @@ fun ConversationDetailScreen(
                 },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
-                Text(text = "Send")
+                Text("Send")
             }
         }
     }
