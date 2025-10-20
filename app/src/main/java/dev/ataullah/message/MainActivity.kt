@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentRoute) {
                     if (currentRoute != null && currentRoute != NavRoutes.Permission.route) {
                         viewModel.refreshSimOptions()
+                        if (currentRoute == NavRoutes.Conversations.route) {
+                            viewModel.loadConversations()
+                        }
                     }
                 }
 
