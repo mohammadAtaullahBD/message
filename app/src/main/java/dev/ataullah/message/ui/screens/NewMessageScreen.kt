@@ -72,7 +72,6 @@ fun NewMessageScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // 🧩 Main UI
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -113,7 +112,6 @@ fun NewMessageScreen(
             Spacer(modifier = Modifier.weight(1f))
         }
 
-        // ✉️ Bottom Message Bar
         BottomMessageBar(
             modifier = Modifier.align(Alignment.BottomCenter),
             body = body,
@@ -234,7 +232,6 @@ fun BottomMessageBar(
         }
     }
 }
-
 
 private data class ContactInfo(val name: String?, val number: String)
 
