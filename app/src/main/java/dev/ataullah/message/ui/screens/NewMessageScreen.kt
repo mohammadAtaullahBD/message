@@ -9,10 +9,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.ataullah.message.model.SimOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.max
 
 @Composable
 fun NewMessageScreen(
@@ -80,8 +83,6 @@ fun NewMessageScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .navigationBarsPadding()
-            .imePadding()
     ) {
 
         Column(
@@ -169,9 +170,16 @@ fun BottomMessageBar(
     onSimChange: (Int) -> Unit,
     onSend: () -> Unit
 ) {
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val navBottom = WindowInsets.navigationBars.getBottom(density)
+    val additionalBottomPadding = with(density) { max(imeBottom, navBottom).toDp() }
+
     Surface(
         modifier = modifier
-            .fillMaxWidth().padding(16.dp),
+            .fillMaxWidth()
+            .padding(16.dp)
+            .padding(bottom = additionalBottomPadding),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
     ) {

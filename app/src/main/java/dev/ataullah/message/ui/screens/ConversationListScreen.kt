@@ -25,7 +25,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,18 +50,15 @@ fun ConversationListScreen(
 ) {
     val context = LocalContext.current
 
-    val sortedConversations = remember(conversations) {
-        conversations.sortedByDescending { convo ->
-            convo.messages.lastOrNull()?.date ?: Long.MIN_VALUE
-        }
+    val sortedConversations = conversations.sortedByDescending { convo ->
+        convo.messages.lastOrNull()?.date ?: Long.MIN_VALUE
     }
 
     val contactCache = remember { mutableStateMapOf<String, ContactUtils.ContactInfo?>() }
 
-    val sortedAddresses = sortedConversations.map { it.address }
-
-    LaunchedEffect(sortedAddresses) {
-        val missingAddresses = sortedAddresses.filter { it !in contactCache }
+    LaunchedEffect(sortedConversations) {
+        val addresses = sortedConversations.map { it.address }.toSet()
+        val missingAddresses = addresses.filter { it !in contactCache }
 
         if (missingAddresses.isNotEmpty()) {
             val resolved = withContext(Dispatchers.IO) {
@@ -71,6 +67,11 @@ fun ConversationListScreen(
                 }
             }
             contactCache.putAll(resolved)
+        }
+
+        val staleKeys = contactCache.keys.toList().filter { it !in addresses }
+        if (staleKeys.isNotEmpty()) {
+            staleKeys.forEach { contactCache.remove(it) }
         }
     }
 
