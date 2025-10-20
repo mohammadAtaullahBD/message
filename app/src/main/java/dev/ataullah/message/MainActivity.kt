@@ -209,8 +209,7 @@ class MainActivity : ComponentActivity() {
                                 onSend = { number, body, subscriptionId ->
                                     viewModel.sendMessage(number, body, subscriptionId)
                                     navController.popBackStack()
-                                },
-                                onCancel = { navController.popBackStack() }
+                                }
                             )
                         }
                     }
