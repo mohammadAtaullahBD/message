@@ -57,6 +57,7 @@ fun NewMessageScreen(
     var selectedContact by remember { mutableStateOf<ContactInfo?>(null) }
     var contactSuggestions by remember { mutableStateOf<List<ContactInfo>>(emptyList()) }
     var allContacts by remember { mutableStateOf<List<ContactInfo>>(emptyList()) }
+    var suggestionsVisible by remember { mutableStateOf(initialAddress.isNotBlank()) }
 
     LaunchedEffect(Unit) {
         val contacts = withContext(Dispatchers.IO) {
@@ -65,8 +66,12 @@ fun NewMessageScreen(
         allContacts = contacts
     }
 
-    LaunchedEffect(allContacts, recipientInput) {
-        contactSuggestions = buildSuggestions(allContacts, recipientInput)
+    LaunchedEffect(allContacts, recipientInput, suggestionsVisible) {
+        contactSuggestions = if (suggestionsVisible) {
+            buildSuggestions(allContacts, recipientInput)
+        } else {
+            emptyList()
+        }
         selectedContact = resolveSelectedContact(allContacts, recipientInput, selectedContact)
     }
 
@@ -82,6 +87,7 @@ fun NewMessageScreen(
                 value = recipientInput,
                 onValueChange = {
                     recipientInput = it
+                    suggestionsVisible = true
                     contactSuggestions = buildSuggestions(allContacts, it)
                     selectedContact = resolveSelectedContact(allContacts, it, selectedContact)
                 },
@@ -102,9 +108,10 @@ fun NewMessageScreen(
                 SuggestionRow(
                     contact = contact,
                     onSelected = {
-                        recipientInput = it.number
+                        recipientInput = it.name ?: it.number
                         selectedContact = it
                         contactSuggestions = emptyList()
+                        suggestionsVisible = false
                     }
                 )
             }
@@ -165,7 +172,7 @@ fun BottomMessageBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
         ) {
 
             TextField(
@@ -173,7 +180,9 @@ fun BottomMessageBar(
                 onValueChange = onBodyChange,
                 placeholder = { Text("Send SMS") },
                 modifier = Modifier.weight(1f),
-                singleLine = true,
+                singleLine = false,
+                minLines = 1,
+                maxLines = 6,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
