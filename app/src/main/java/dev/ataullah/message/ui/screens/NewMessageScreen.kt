@@ -209,6 +209,11 @@ fun BottomMessageBar(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = "Switch SIM",
+                    tint = Color(0xFF2196F3)
+                )
             }
 
             val sendTint = if (body.isNotBlank()) {
