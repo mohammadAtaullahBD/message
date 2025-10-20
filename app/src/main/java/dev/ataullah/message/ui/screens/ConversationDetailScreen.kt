@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +37,9 @@ fun ConversationDetailScreen(
     address: String,
     conversation: Conversation?,
     simOptions: List<SimOption>,
-    onSend: (String, Int?) -> Unit
+    onSend: (String, Int?) -> Unit,
+    selectedMessageIds: Set<Long>,
+    onToggleMessageSelection: (Long) -> Unit
 ) {
     val messages = remember(address, conversation?.messages) {
         conversation?.messages ?: emptyList()
@@ -54,7 +57,11 @@ fun ConversationDetailScreen(
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -63,7 +70,17 @@ fun ConversationDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(messages) { msg ->
-                MessageBubble(message = msg)
+                val isSelected = selectedMessageIds.contains(msg.id)
+                MessageBubble(
+                    message = msg,
+                    isSelected = isSelected,
+                    onLongPress = { onToggleMessageSelection(msg.id) },
+                    onClick = {
+                        if (selectedMessageIds.isNotEmpty()) {
+                            onToggleMessageSelection(msg.id)
+                        }
+                    }
+                )
             }
         }
 
@@ -92,15 +109,21 @@ fun ConversationDetailScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(
+    message: Message,
+    isSelected: Boolean,
+    onLongPress: () -> Unit,
+    onClick: () -> Unit
+) {
     val isOutgoing = message.type == Telephony.Sms.MESSAGE_TYPE_SENT ||
         message.type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
     val arrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
-    val bubbleColor = if (isOutgoing) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+    val bubbleColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        isOutgoing -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val contentColor = if (isOutgoing) {
         MaterialTheme.colorScheme.onPrimaryContainer
@@ -134,7 +157,14 @@ private fun MessageBubble(message: Message) {
                 contentColor = contentColor,
                 shape = shape,
                 tonalElevation = 1.dp,
-                modifier = Modifier.fillMaxWidth(0.85f)
+                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongPress,
+                        enabled = true
+                    )
             ) {
                 Text(
                     text = message.body,
