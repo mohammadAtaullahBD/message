@@ -1,11 +1,8 @@
 package dev.ataullah.message.ui.screens
 
 import android.provider.Telephony
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,17 +22,14 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import dev.ataullah.message.model.Conversation
 import dev.ataullah.message.model.Message
 import dev.ataullah.message.util.ContactUtils
@@ -56,20 +50,15 @@ fun ConversationListScreen(
 ) {
     val context = LocalContext.current
 
-    val sortedConversations by remember(conversations) {
-        derivedStateOf {
-            conversations.sortedByDescending { convo ->
-                convo.messages.maxOfOrNull { it.date } ?: Long.MIN_VALUE
-            }
-        }
+    val sortedConversations = conversations.sortedByDescending { convo ->
+        convo.messages.lastOrNull()?.date ?: Long.MIN_VALUE
     }
 
     val contactCache = remember { mutableStateMapOf<String, ContactUtils.ContactInfo?>() }
 
     LaunchedEffect(sortedConversations) {
-        val missingAddresses = sortedConversations
-            .map { it.address }
-            .filter { it !in contactCache }
+        val addresses = sortedConversations.map { it.address }.toSet()
+        val missingAddresses = addresses.filter { it !in contactCache }
 
         if (missingAddresses.isNotEmpty()) {
             val resolved = withContext(Dispatchers.IO) {
@@ -78,6 +67,11 @@ fun ConversationListScreen(
                 }
             }
             contactCache.putAll(resolved)
+        }
+
+        val staleKeys = contactCache.keys.toList().filter { it !in addresses }
+        if (staleKeys.isNotEmpty()) {
+            staleKeys.forEach { contactCache.remove(it) }
         }
     }
 
@@ -93,29 +87,29 @@ fun ConversationListScreen(
             )
         }
 
-        val filtered by remember(sortedConversations, showSearch, searchQuery) {
-            derivedStateOf {
-                val query = searchQuery.trim().lowercase()
-                if (!showSearch || query.isBlank()) {
-                    sortedConversations
-                } else {
-                    sortedConversations.filter { convo ->
-                        val number = convo.address
-                        val contactName = contactCache[number]?.name.orEmpty()
-                        val lastBody = convo.messages.lastOrNull()?.body ?: ""
-                        number.contains(query, ignoreCase = true) ||
-                            lastBody.contains(query, ignoreCase = true) ||
-                            contactName.contains(query, ignoreCase = true)
-                    }
-                }
+        val query = searchQuery.trim().lowercase()
+        val filtered = if (!showSearch || query.isBlank()) {
+            sortedConversations
+        } else {
+            sortedConversations.filter { convo ->
+                val number = convo.address
+                val contactName = contactCache[number]?.name.orEmpty()
+                val lastBody = convo.messages.lastOrNull()?.body ?: ""
+                number.contains(query, ignoreCase = true) ||
+                    lastBody.contains(query, ignoreCase = true) ||
+                    contactName.contains(query, ignoreCase = true)
             }
         }
 
-        LaunchedEffect(filtered) {
-            onVisibleAddressesChange(filtered.map { it.address }.toSet())
+        val visibleAddresses = filtered.map { it.address }
+
+        LaunchedEffect(visibleAddresses) {
+            onVisibleAddressesChange(visibleAddresses.toSet())
         }
 
-        LazyColumn {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth()
+        ) {
             items(filtered, key = { it.address }) { convo ->
                 val contactInfo = contactCache[convo.address]
                 val displayName = contactInfo?.name ?: convo.address
