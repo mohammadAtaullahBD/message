@@ -1,12 +1,9 @@
 package dev.ataullah.message.ui.screens
 
-import android.content.ContentUris
-import android.net.Uri
+import android.content.ContentResolver
 import android.provider.ContactsContract
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,31 +12,33 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.SimCard
+import androidx.compose.material.icons.outlined.SimCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ataullah.message.model.SimOption
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -50,28 +49,25 @@ fun NewMessageScreen(
     onSend: (String, String, Int?) -> Unit
 ) {
     val context = LocalContext.current
-    var number by remember { mutableStateOf(initialAddress) }
+    var recipientInput by remember { mutableStateOf(initialAddress) }
     var body by remember { mutableStateOf(initialBody) }
     var selectedSimId by remember(simOptions) {
         mutableStateOf(simOptions.firstOrNull()?.subscriptionId)
     }
-    var selectedContactName by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    var selectedContact by remember { mutableStateOf<ContactInfo?>(null) }
+    var contactSuggestions by remember { mutableStateOf<List<ContactInfo>>(emptyList()) }
+    var allContacts by remember { mutableStateOf<List<ContactInfo>>(emptyList()) }
 
-    val contactPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickContact()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                val info = withContext(Dispatchers.IO) {
-                    resolveContact(context.contentResolver, uri)
-                }
-                info?.let {
-                    number = it.number
-                    selectedContactName = it.name
-                }
-            }
+    LaunchedEffect(Unit) {
+        val contacts = withContext(Dispatchers.IO) {
+            loadContacts(context.contentResolver)
         }
+        allContacts = contacts
+    }
+
+    LaunchedEffect(allContacts, recipientInput) {
+        contactSuggestions = buildSuggestions(allContacts, recipientInput)
+        selectedContact = resolveSelectedContact(allContacts, recipientInput, selectedContact)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -84,17 +80,34 @@ fun NewMessageScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TextField(
-                value = number,
-                onValueChange = { number = it },
-                label = { Text("Recipient number") },
-                modifier = Modifier.fillMaxWidth()
+                value = recipientInput,
+                onValueChange = {
+                    recipientInput = it
+                    contactSuggestions = buildSuggestions(allContacts, it)
+                    selectedContact = resolveSelectedContact(allContacts, it, selectedContact)
+                },
+                label = { Text("Recipient") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
 
-            OutlinedButton(
-                onClick = { contactPicker.launch(null) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(selectedContactName?.let { "Contact: $it" } ?: "Choose from contacts")
+            if (selectedContact?.name != null && recipientInput.isNotBlank()) {
+                Text(
+                    text = "Contact: ${selectedContact?.name}",
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            contactSuggestions.take(5).forEach { contact ->
+                SuggestionRow(
+                    contact = contact,
+                    onSelected = {
+                        recipientInput = it.number
+                        selectedContact = it
+                        contactSuggestions = emptyList()
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -109,17 +122,25 @@ fun NewMessageScreen(
             simOptions = simOptions,
             onSimChange = {
                 selectedSimId = it
+                val info = simOptions.firstOrNull { option -> option.subscriptionId == it }
                 Toast.makeText(
                     context,
-                    "Selected SIM ${if (it == simOptions[0].subscriptionId) "1" else "2"}",
+                    info?.let { option -> "Selected ${option.label}" } ?: "SIM selected",
                     Toast.LENGTH_SHORT
                 ).show()
             },
             onSend = {
-                val trimmedNumber = number.trim()
+                val trimmedInput = recipientInput.trim()
                 val trimmedBody = body.trim()
-                if (trimmedBody.isNotEmpty() && trimmedNumber.isNotEmpty()) {
-                    onSend(trimmedNumber, trimmedBody, selectedSimId)
+                if (trimmedBody.isNotEmpty()) {
+                    val resolvedNumber = determineRecipientNumber(
+                        input = trimmedInput,
+                        selectedContact = selectedContact,
+                        contacts = allContacts
+                    )
+                    if (!resolvedNumber.isNullOrBlank()) {
+                        onSend(resolvedNumber, trimmedBody, selectedSimId)
+                    }
                 }
             }
         )
@@ -136,59 +157,80 @@ fun BottomMessageBar(
     onSimChange: (Int) -> Unit,
     onSend: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(16.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
 
-        // ✍️ Message Field
-        TextField(
-            value = body,
-            onValueChange = onBodyChange,
-            placeholder = { Text("Send SMS") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
-        )
+            TextField(
+                value = body,
+                onValueChange = onBodyChange,
+                placeholder = { Text("Send SMS") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                )
+            )
 
-        // 🔄 SIM Switch button (this was missing!)
-        if (simOptions.size > 1) {
-            IconButton(onClick = {
-                val newSim =
-                    if (selectedSimId == simOptions[0].subscriptionId)
-                        simOptions[1].subscriptionId
-                    else
-                        simOptions[0].subscriptionId
-                onSimChange(newSim)
-            }) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .background(Color.DarkGray, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (selectedSimId == simOptions[0].subscriptionId) "1" else "2",
-                        color = Color.White,
-                        textAlign = TextAlign.Center
+            if (simOptions.size > 1) {
+                IconButton(onClick = {
+                    val currentIndex = simOptions.indexOfFirst { it.subscriptionId == selectedSimId }
+                    val nextIndex = if (currentIndex == -1) 0 else (currentIndex + 1) % simOptions.size
+                    val newSim = simOptions[nextIndex].subscriptionId
+                    onSimChange(newSim)
+                }) {
+                    val currentSim = simOptions.firstOrNull { it.subscriptionId == selectedSimId }
+                        ?: simOptions[0]
+                    val icon = if (currentSim.subscriptionId == simOptions[0].subscriptionId) {
+                        Icons.Filled.SimCard
+                    } else {
+                        Icons.Outlined.SimCard
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "Switch SIM",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-        }
 
-        // ✅ Send Button
-        IconButton(
-            onClick = onSend,
-            enabled = body.isNotBlank(),
-            modifier = Modifier
-                .size(55.dp)
-                .background(
-                    if (body.isNotBlank()) Color(0xFF2196F3) else Color.Gray,
-                    CircleShape
+            val sendTint = if (body.isNotBlank()) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            IconButton(
+                onClick = onSend,
+                enabled = body.isNotBlank(),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-        ) {
-            Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.White)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send",
+                    tint = sendTint
+                )
+            }
         }
     }
 }
@@ -196,20 +238,103 @@ fun BottomMessageBar(
 
 private data class ContactInfo(val name: String?, val number: String)
 
-private fun resolveContact(resolver: android.content.ContentResolver, uri: Uri): ContactInfo? {
-    val id = ContentUris.parseId(uri)
-    resolver.query(
-        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-        arrayOf(
-            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-            ContactsContract.CommonDataKinds.Phone.NUMBER
-        ),
-        "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
-        arrayOf(id.toString()), null
-    )?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            return ContactInfo(cursor.getString(0), cursor.getString(1))
+@Composable
+private fun SuggestionRow(contact: ContactInfo, onSelected: (ContactInfo) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelected(contact) }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            contact.name?.let {
+                Text(text = it, color = MaterialTheme.colorScheme.onSurface)
+            }
+            Text(
+                text = contact.number,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
-    return null
 }
+
+private fun loadContacts(resolver: ContentResolver): List<ContactInfo> {
+    val projection = arrayOf(
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+        ContactsContract.CommonDataKinds.Phone.NUMBER
+    )
+    val contacts = mutableListOf<ContactInfo>()
+    resolver.query(
+        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+        projection,
+        null,
+        null,
+        "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE NOCASE ASC"
+    )?.use { cursor ->
+        val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+        val numberIndex = cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
+        while (cursor.moveToNext()) {
+            val name = cursor.getString(nameIndex)
+            val number = cursor.getString(numberIndex)
+            if (!number.isNullOrBlank()) {
+                contacts += ContactInfo(name, number)
+            }
+        }
+    }
+    return contacts.distinctBy { sanitizeNumber(it.number) }
+}
+
+private fun buildSuggestions(contacts: List<ContactInfo>, query: String): List<ContactInfo> {
+    if (query.isBlank()) return emptyList()
+    val trimmed = query.trim()
+    val sanitizedQuery = sanitizeNumber(trimmed)
+    return contacts.filter { contact ->
+        val matchesName = contact.name?.contains(trimmed, ignoreCase = true) == true
+        val matchesNumber = sanitizedQuery.isNotEmpty() &&
+            sanitizeNumber(contact.number).contains(sanitizedQuery)
+        matchesName || matchesNumber
+    }
+}
+
+private fun resolveSelectedContact(
+    contacts: List<ContactInfo>,
+    input: String,
+    currentSelection: ContactInfo?
+): ContactInfo? {
+    if (input.isBlank()) return null
+    val sanitizedInput = sanitizeNumber(input)
+    val directMatch = contacts.firstOrNull { contact ->
+        sanitizeNumber(contact.number) == sanitizedInput && sanitizedInput.isNotEmpty()
+    }
+    if (directMatch != null) return directMatch
+    val nameMatch = contacts.firstOrNull { contact ->
+        contact.name?.equals(input.trim(), ignoreCase = true) == true
+    }
+    return nameMatch ?: currentSelection?.takeIf {
+        sanitizeNumber(it.number) == sanitizedInput && sanitizedInput.isNotEmpty()
+    }
+}
+
+private fun determineRecipientNumber(
+    input: String,
+    selectedContact: ContactInfo?,
+    contacts: List<ContactInfo>
+): String? {
+    val sanitizedInput = sanitizeNumber(input)
+    if (!selectedContact?.number.isNullOrBlank()) {
+        return selectedContact?.number
+    }
+    if (sanitizedInput.isNotEmpty()) {
+        return contacts.firstOrNull {
+            sanitizeNumber(it.number) == sanitizedInput
+        }?.number ?: input
+    }
+    val nameMatch = contacts.firstOrNull {
+        it.name?.equals(input, ignoreCase = true) == true
+    }
+    return nameMatch?.number
+}
+
+private fun sanitizeNumber(value: String?): String =
+    value?.filter { it.isDigit() } ?: ""
