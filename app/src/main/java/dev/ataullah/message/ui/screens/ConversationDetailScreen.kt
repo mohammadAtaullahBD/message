@@ -2,6 +2,7 @@ package dev.ataullah.message.ui.screens
 
 import android.provider.Telephony
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,8 +11,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -78,17 +81,16 @@ fun ConversationDetailScreen(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             TextField(
                 value = input,
                 onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 72.dp),
                 placeholder = { Text("Type a message") }
             )
-            Button(
+            SmallFloatingActionButton(
                 onClick = {
                     val text = input.trim()
                     if (text.isNotEmpty()) {
@@ -96,9 +98,12 @@ fun ConversationDetailScreen(
                         input = ""
                     }
                 },
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.align(Alignment.BottomEnd)
             ) {
-                Text("Send")
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send message"
+                )
             }
         }
     }
@@ -108,7 +113,7 @@ fun ConversationDetailScreen(
 private fun MessageBubble(message: Message) {
     val isOutgoing = message.type == Telephony.Sms.MESSAGE_TYPE_SENT ||
         message.type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
-    val alignment = if (isOutgoing) Alignment.End else Alignment.Start
+    val arrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     val bubbleColor = if (isOutgoing) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -136,35 +141,50 @@ private fun MessageBubble(message: Message) {
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = alignment
-    ) {
-        Surface(
-            color = bubbleColor,
-            contentColor = contentColor,
-            shape = shape,
-            tonalElevation = 1.dp
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = arrangement
+        ) {
+            Surface(
+                color = bubbleColor,
+                contentColor = contentColor,
+                shape = shape,
+                tonalElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth(0.85f)
+            ) {
+                Text(
+                    text = message.body,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = arrangement
         ) {
             Text(
-                text = message.body,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                text = timestamp,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(
-            text = timestamp,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
         if (isOutgoing && statusText != null) {
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.labelSmall,
-                color = statusColor,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = arrangement
+            ) {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor
+                )
+            }
         }
     }
 }
