@@ -1,0 +1,8 @@
+I need a mobile application that will work as my phone's default sms app. The app will have 3-4 pages: Page 1 will show all the messages. This page will show when the user launches the app(will show the list of SMS). This page will have filtering options by tag, searching options by number, or sms etc. It should also have the functionality to create a new tag by selecting a few senders. The user will be able to delete sms by selecting them.
+
+Page 2 will be the sms writing page. The first user will be able to select the people to whom he wants to send the message. To send the SMS, it will show the option which sim user wants to use. If the user selects a default sim for sms in his settings, then it will use that without showing the option.
+
+Page 3 will be the control or setting page of our app. This app will have a special functionality: the user will be able to select a sender (manually or by tag of sender ) to forward the sms to telegram bot as soon as new SMS arrive from the selected sender. User should have the control to manage multiple telegram bots where the sms will be forwarded (delete, update, etc.), and other functionality like: Archived, Spam & block, Mark all as read, etc. 
+Implement other pages that a good SMS app should have.
+
+Use minimal design to look modern. Also, implement dark mode and set the light or dark mode based on user settings.
