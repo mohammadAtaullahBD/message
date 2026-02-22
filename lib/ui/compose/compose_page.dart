@@ -89,7 +89,7 @@ class _ComposePageState extends State<ComposePage> {
             const SizedBox(height: 16),
             if (!_isLoading && _simCards.length > 1)
               DropdownButtonFormField<int>(
-                value: _selectedSimId,
+                initialValue: _selectedSimId,
                 decoration: const InputDecoration(
                   labelText: 'Send via SIM',
                   border: OutlineInputBorder(),
@@ -99,7 +99,7 @@ class _ComposePageState extends State<ComposePage> {
                   final isDefault = sim['isDefault'] == true ? ' (Default)' : '';
                   return DropdownMenuItem<int>(
                     value: sim['id'],
-                    child: Text('\${sim['name']}\$isDefault'),
+                    child: Text('${sim['name']}$isDefault'),
                   );
                 }).toList(),
                 onChanged: (val) {

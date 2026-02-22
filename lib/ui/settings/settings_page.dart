@@ -112,7 +112,7 @@ class _TelegramBotsPageState extends State<TelegramBotsPage> {
                   'chat_id': chatCtrl.text,
                   'active': 1,
                 });
-                Navigator.pop(ctx);
+                if (ctx.mounted) Navigator.pop(ctx);
                 _loadBots();
               }
             },
@@ -133,7 +133,7 @@ class _TelegramBotsPageState extends State<TelegramBotsPage> {
           final bot = _bots[index];
           return ListTile(
             title: Text(bot['name']),
-            subtitle: Text('Chat: \${bot['chat_id']}'),
+            subtitle: Text('Chat: ${bot['chat_id']}'),
             trailing: IconButton(
               icon: const Icon(Icons.delete),
               onPressed: () async {
@@ -193,7 +193,7 @@ class _BlockedSendersPageState extends State<BlockedSendersPage> {
               if (numCtrl.text.isNotEmpty) {
                 final db = await DatabaseHelper.instance.database;
                 await db.insert('blocked_senders', {'sender_address': numCtrl.text});
-                Navigator.pop(ctx);
+                if (ctx.mounted) Navigator.pop(ctx);
                 _load();
               }
             },
@@ -288,7 +288,7 @@ class _ForwardingRulesPageState extends State<ForwardingRulesPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<int>(
-                      value: selectedBotId,
+                      initialValue: selectedBotId,
                       decoration: const InputDecoration(labelText: 'Select Bot'),
                       items: bots.map((b) => DropdownMenuItem<int>(
                         value: b['id'] as int, child: Text(b['name'] as String)
@@ -300,7 +300,7 @@ class _ForwardingRulesPageState extends State<ForwardingRulesPage> {
                     const SizedBox(height: 16),
                     const Text('OR Target Tag (Optional)'),
                     DropdownButtonFormField<int?>(
-                      value: selectedTagId,
+                      initialValue: selectedTagId,
                       decoration: const InputDecoration(labelText: 'Select Tag'),
                       items: [
                         const DropdownMenuItem<int?>(value: null, child: Text('None')),
@@ -323,7 +323,7 @@ class _ForwardingRulesPageState extends State<ForwardingRulesPage> {
                         'tag_id': selectedTagId,
                         'sender_address': senderCtrl.text.isEmpty ? null : senderCtrl.text,
                       });
-                      if (mounted) Navigator.pop(ctx);
+                      if (ctx.mounted) Navigator.pop(ctx);
                       _load();
                     }
                   },
@@ -345,10 +345,10 @@ class _ForwardingRulesPageState extends State<ForwardingRulesPage> {
         itemCount: _rules.length,
         itemBuilder: (context, index) {
           final r = _rules[index];
-          final target = r['tag_name'] != null ? 'Tag: \${r['tag_name']}' : 'Sender: \${r['sender_address']}';
+          final target = r['tag_name'] != null ? 'Tag: ${r['tag_name']}' : 'Sender: ${r['sender_address']}';
           return ListTile(
-            title: Text('\${r['bot_name']}'),
-            subtitle: Text('Forwards \$target'),
+            title: Text('${r['bot_name']}'),
+            subtitle: Text('Forwards $target'),
             trailing: IconButton(
               icon: const Icon(Icons.delete),
               onPressed: () async {

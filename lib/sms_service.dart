@@ -2,7 +2,7 @@ import 'package:telephony/telephony.dart';
 import 'database_helper.dart';
 import 'telegram_service.dart';
 
-onBackgroundMessage(SmsMessage message) async {
+Future<void> onBackgroundMessage(SmsMessage message) async {
   // This headless callback runs when the app is in background.
   final senderInfo = message.address ?? "Unknown";
   final body = message.body ?? "";
@@ -30,7 +30,7 @@ onBackgroundMessage(SmsMessage message) async {
     await TelegramService.instance.sendMessage(
       rule['bot_token'] as String,
       rule['chat_id'] as String,
-      "SMS from \$senderInfo: \$body"
+      "SMS from $senderInfo: $body"
     );
   }
 
@@ -47,7 +47,7 @@ onBackgroundMessage(SmsMessage message) async {
     await TelegramService.instance.sendMessage(
       rule['bot_token'] as String,
       rule['chat_id'] as String,
-      "SMS from \$senderInfo (Tagged): \$body"
+      "SMS from $senderInfo (Tagged): $body"
     );
   }
 }

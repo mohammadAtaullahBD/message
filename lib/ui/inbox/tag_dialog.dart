@@ -27,7 +27,7 @@ Future<void> showTagDialog(BuildContext context, WidgetRef ref, Set<String> sele
                     onTap: () async {
                       await _assignTags(tag['id'], selectedSenders);
                       ref.invalidate(tagsProvider);
-                      Navigator.pop(ctx);
+                      if (ctx.mounted) Navigator.pop(ctx);
                     },
                   )),
                   ListTile(
@@ -76,7 +76,7 @@ Future<void> _showCreateTagDialog(BuildContext context, WidgetRef ref, Set<Strin
               final tagId = await db.insert('tags', {'name': controller.text, 'color': '#000000'});
               await _assignTags(tagId, selectedSenders);
               ref.invalidate(tagsProvider);
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             }
           },
           child: const Text('Create & Assign'),
