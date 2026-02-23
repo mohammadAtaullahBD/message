@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../sim_service.dart';
 
 class ComposePage extends StatefulWidget {
@@ -13,6 +14,7 @@ class _ComposePageState extends State<ComposePage> {
   final _recipientController = TextEditingController();
   final _messageController = TextEditingController();
   List<Map<String, dynamic>> _simCards = [];
+  List<Contact> _contacts = [];
   int? _selectedSimId;
   bool _isLoading = true;
   bool _isSending = false;
@@ -24,6 +26,18 @@ class _ComposePageState extends State<ComposePage> {
       _recipientController.text = widget.initialRecipient!;
     }
     _fetchSimCards();
+    _fetchContacts();
+  }
+
+  Future<void> _fetchContacts() async {
+    if (await FlutterContacts.requestPermission()) {
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      if (mounted) {
+        setState(() {
+          _contacts = contacts;
+        });
+      }
+    }
   }
 
   Future<void> _fetchSimCards() async {
@@ -76,15 +90,75 @@ class _ComposePageState extends State<ComposePage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            TextField(
-              controller: _recipientController,
-              decoration: const InputDecoration(
-                labelText: 'To',
-                hintText: 'Phone number',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-              keyboardType: TextInputType.phone,
+            Autocomplete<Contact>(
+              displayStringForOption: (Contact option) => option.phones.isNotEmpty ? option.phones.first.number : '',
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<Contact>.empty();
+                }
+                final query = textEditingValue.text.toLowerCase();
+                return _contacts.where((Contact contact) {
+                  final nameMatches = contact.displayName.toLowerCase().contains(query);
+                  final phoneMatches = contact.phones.any((phone) => phone.number.replaceAll(RegExp(r'\D'), '').contains(query.replaceAll(RegExp(r'\D'), '')));
+                  return nameMatches || phoneMatches;
+                });
+              },
+              onSelected: (Contact selection) {
+                if (selection.phones.isNotEmpty) {
+                  _recipientController.text = selection.phones.first.number;
+                }
+              },
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                // Keep the _recipientController in sync if they type without selecting
+                controller.addListener(() {
+                  if (_recipientController.text != controller.text) {
+                     _recipientController.text = controller.text;
+                  }
+                });
+                // Initialize the controller with our initial value if passed
+                if (_recipientController.text.isNotEmpty && controller.text.isEmpty) {
+                  controller.text = _recipientController.text;
+                }
+                
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'To',
+                    hintText: 'Phone number or name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  keyboardType: TextInputType.phone,
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: options.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final Contact option = options.elementAt(index);
+                          final phone = option.phones.isNotEmpty ? option.phones.first.number : 'No number';
+                          return ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.person)),
+                            title: Text(option.displayName),
+                            subtitle: Text(phone),
+                            onTap: () {
+                              onSelected(option);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             if (!_isLoading && _simCards.length > 1)

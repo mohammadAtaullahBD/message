@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../providers/sms_provider.dart';
+import '../../providers/database_providers.dart';
 import 'tag_dialog.dart';
 import '../compose/compose_page.dart';
 import '../settings/settings_page.dart';
@@ -17,6 +18,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   final Set<String> _selectedAddresses = {};
   bool _isSelectionMode = false;
   String _searchQuery = '';
+  int? _selectedTagId;
 
   void _toggleSelection(String address) {
     setState(() {
@@ -93,34 +95,80 @@ class _InboxPageState extends ConsumerState<InboxPage> {
               )
             ],
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search by number or content...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
+              preferredSize: const Size.fromHeight(110),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search by number or content...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val.toLowerCase();
+                        });
+                      },
                     ),
                   ),
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val.toLowerCase();
-                    });
-                  },
-                ),
+                  ref.watch(tagsProvider).when(
+                    data: (tags) {
+                      if (tags.isEmpty) return const SizedBox.shrink();
+                      return SizedBox(
+                        height: 40,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: tags.length,
+                          itemBuilder: (ctx, idx) {
+                            final t = tags[idx];
+                            final isSelected = _selectedTagId == t['id'];
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(t['name']),
+                                selected: isSelected,
+                                onSelected: (val) {
+                                  setState(() {
+                                    _selectedTagId = val ? t['id'] : null;
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (e, st) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
             ),
           ),
       body: conversationsAsync.when(
         data: (conversations) {
+          final senderTagsAsync = ref.watch(senderTagsProvider);
+          final senderTags = senderTagsAsync.value ?? [];
+          
           final filtered = conversations.where((c) {
             final addr = c.address.toLowerCase();
             final body = c.latestMessage.body?.toLowerCase() ?? '';
-            return addr.contains(_searchQuery) || body.contains(_searchQuery);
+            final matchesSearch = addr.contains(_searchQuery) || body.contains(_searchQuery);
+            
+            bool matchesTag = true;
+            if (_selectedTagId != null) {
+               matchesTag = senderTags.any((st) => st['sender_address'] == c.address && st['tag_id'] == _selectedTagId);
+            }
+            
+            return matchesSearch && matchesTag;
           }).toList();
 
           if (filtered.isEmpty) {
